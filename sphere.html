@@ -23,6 +23,7 @@
 
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000, 0); // ← 第2引数を 0 にすると透明になります
     document.body.appendChild(renderer.domElement);
 
     // ===== 丸い点のためのテクスチャ生成 =====
