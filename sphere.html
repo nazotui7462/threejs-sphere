@@ -2,41 +2,22 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>Gradient Fibonacci Sphere with Round Points</title>
+  <title>丸い点のグラデーション球体</title>
   <style>
     body {
       margin: 0;
       background: #000;
       overflow: hidden;
     }
+    canvas {
+      display: block;
+    }
   </style>
 </head>
 <body>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r126/three.min.js"></script>
+
   <script>
-    // 丸い点のテクスチャをキャンバスで作成
-    function createCircleTexture(size = 64) {
-      const canvas = document.createElement('canvas');
-      canvas.width = size;
-      canvas.height = size;
-      const ctx = canvas.getContext('2d');
-
-      const radius = size / 2 * 0.9; // 少し余白を残す
-      ctx.clearRect(0, 0, size, size);
-
-      // 円グラデーションで丸い点を描く
-      const gradient = ctx.createRadialGradient(size / 2, size / 2, radius * 0.1, size / 2, size / 2, radius);
-      gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-      gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(size / 2, size / 2, radius, 0, Math.PI * 2);
-      ctx.fill();
-
-      return new THREE.CanvasTexture(canvas);
-    }
-
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.z = 3;
@@ -45,19 +26,44 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // 🎨 グラデーションカラー（8色）
+    // ===== 丸い点のためのテクスチャ生成 =====
+    function createCircleTexture() {
+      const size = 64;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+
+      const gradient = ctx.createRadialGradient(
+        size / 2, size / 2, 0,
+        size / 2, size / 2, size / 2
+      );
+      gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
+      gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      const texture = new THREE.CanvasTexture(canvas);
+      return texture;
+    }
+
+    const circleTexture = createCircleTexture();
+
+    // ===== グラデーションカラー（8色） =====
     const hexColors = [
       "#70E7FD", "#4AB9FF", "#317DC9", "#338DA8",
       "#60B2AE", "#2E5F6E", "#6FC36D", "#409888"
     ];
     const gradientColors = hexColors.map(hex => new THREE.Color(hex));
 
-    // 🌀 Fibonacci Sphere の点群生成（ちょっとバラつき有り）
     function generateFibonacciPoints(numPoints, radius = 1, jitter = 0.02) {
       const positions = [];
       const colors = [];
       const offset = 2 / numPoints;
-      const increment = Math.PI * (3 - Math.sqrt(5)); // 黄金角
+      const increment = Math.PI * (3 - Math.sqrt(5));
 
       for (let i = 0; i < numPoints; i++) {
         let y = i * offset - 1 + offset / 2;
@@ -67,36 +73,42 @@
         let x = Math.cos(phi) * r;
         let z = Math.sin(phi) * r;
 
-        // 軽くゆらぎを加える
         x += (Math.random() - 0.5) * jitter;
         y += (Math.random() - 0.5) * jitter;
         z += (Math.random() - 0.5) * jitter;
 
         positions.push(x * radius, y * radius, z * radius);
 
-        // グラデーション色計算
         const yNorm = (y + 1) / 2;
-        const index = Math.floor(yNorm * (gradientColors.length - 1));
-        const t = (yNorm * (gradientColors.length - 1)) - index;
+        let index = Math.floor(yNorm * (gradientColors.length - 1));
+        let t = (yNorm * (gradientColors.length - 1)) - index;
 
-        const color = gradientColors[index].clone().lerp(
-          gradientColors[index + 1] || gradientColors[index],
-          t
-        );
+        if (index < 0) index = 0;
+        if (index >= gradientColors.length - 1) {
+          index = gradientColors.length - 2;
+          t = 1;
+        }
+
+        const baseColor = gradientColors[index];
+        const nextColor = gradientColors[index + 1];
+
+        let color = new THREE.Color();
+        if (baseColor && nextColor && typeof baseColor.clone === "function") {
+          color = baseColor.clone().lerp(nextColor, t);
+        } else {
+          color.set(0xffffff);
+        }
+
         colors.push(color.r, color.g, color.b);
       }
 
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
       geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
-
       return geometry;
     }
 
-    // 丸い点用テクスチャ作成
-    const circleTexture = createCircleTexture();
-
-    const sphereGeometry = generateFibonacciPoints(1200);
+    const sphereGeometry = generateFibonacciPoints(1000);
     const sphereMaterial = new THREE.PointsMaterial({
       size: 0.035,
       vertexColors: true,
@@ -104,16 +116,16 @@
       opacity: 0.9,
       map: circleTexture,
       alphaTest: 0.01,
-      sizeAttenuation: true,
+      depthWrite: false,
+      sizeAttenuation: true
     });
     const spherePoints = new THREE.Points(sphereGeometry, sphereMaterial);
     scene.add(spherePoints);
 
-    // 🌫️ 内部ノイズパーティクル
+    // ===== ノイズパーティクル =====
     const noiseParticleCount = 300;
     const noiseGeometry = new THREE.BufferGeometry();
     const noisePositions = [];
-
     for (let i = 0; i < noiseParticleCount; i++) {
       const r = Math.random() * 0.7;
       const theta = Math.random() * 2 * Math.PI;
@@ -123,29 +135,37 @@
       const z = r * Math.cos(phi);
       noisePositions.push(x, y, z);
     }
-
     noiseGeometry.setAttribute("position", new THREE.Float32BufferAttribute(noisePositions, 3));
-
     const noiseMaterial = new THREE.PointsMaterial({
       color: 0xffffff,
       size: 0.01,
       transparent: true,
-      opacity: 0.25,
+      opacity: 0.2,
       map: circleTexture,
       alphaTest: 0.01,
-      sizeAttenuation: true,
+      depthWrite: false,
+      sizeAttenuation: true
     });
-
     const noisePoints = new THREE.Points(noiseGeometry, noiseMaterial);
     scene.add(noisePoints);
 
-    // 🔄 アニメーション（回転＆ノイズ動き）
+    // ===== 背景ウェーブ =====
+    const bgGeometry = new THREE.PlaneGeometry(20, 20, 64, 64);
+    const bgMaterial = new THREE.MeshBasicMaterial({
+      color: 0x222244,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.05
+    });
+    const bgMesh = new THREE.Mesh(bgGeometry, bgMaterial);
+    bgMesh.position.z = -5;
+    scene.add(bgMesh);
+
+    // ===== アニメーション =====
     const animate = () => {
       requestAnimationFrame(animate);
-
-      spherePoints.rotation.y += 0.0012;
-      spherePoints.rotation.x += 0.0006;
-
+      spherePoints.rotation.y += 0.001;
+      spherePoints.rotation.x += 0.0005;
       noisePoints.rotation.y -= 0.0006;
 
       const posAttr = noiseGeometry.attributes.position;
@@ -157,11 +177,18 @@
         x += (Math.random() - 0.5) * scale;
         y += (Math.random() - 0.5) * scale;
         z += (Math.random() - 0.5) * scale;
-
         posAttr.setXYZ(i, x, y, z);
       }
-
       posAttr.needsUpdate = true;
+
+      const time = performance.now() * 0.001;
+      for (let i = 0; i < bgGeometry.attributes.position.count; i++) {
+        const x = bgGeometry.attributes.position.getX(i);
+        const y = bgGeometry.attributes.position.getY(i);
+        const z = Math.sin(x * 0.5 + time) * 0.2 + Math.cos(y * 0.5 + time) * 0.2;
+        bgGeometry.attributes.position.setZ(i, z);
+      }
+      bgGeometry.attributes.position.needsUpdate = true;
 
       renderer.render(scene, camera);
     };
