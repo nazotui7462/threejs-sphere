@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>Wave Background</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: transparent;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r126/three.min.js"></script>
+  <script id="vertexShader" type="x-shader/x-vertex">
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = vec4(position, 1.0);
+    }
+  </script>
+  <script id="fragmentShader" type="x-shader/x-fragment">
+    uniform float time;
+    varying vec2 vUv;
+
+    void main() {
+      float wave = sin(vUv.x * 10.0 + time * 0.8) * 0.03 +
+                   sin(vUv.y * 14.0 + time * 1.1) * 0.03;
+      vec3 color = vec3(0.1 + wave, 0.15 + wave * 1.5, 0.2 + wave * 2.0);
+      gl_FragColor = vec4(color, 0.4); // ← α値でうっすらとした背景に
+    }
+  </script>
+  <script>
+    const scene = new THREE.Scene();
+    const camera = new THREE.Camera();
+    const renderer = new THREE.WebGLRenderer({ alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000, 0);
+    document.body.appendChild(renderer.domElement);
+
+    const uniforms = {
+      time: { value: 0.0 }
+    };
+
+    const material = new THREE.ShaderMaterial({
+      uniforms: uniforms,
+      vertexShader: document.getElementById("vertexShader").textContent,
+      fragmentShader: document.getElementById("fragmentShader").textContent,
+      transparent: true
+    });
+
+    const plane = new THREE.PlaneGeometry(2, 2);
+    const mesh = new THREE.Mesh(plane, material);
+    scene.add(mesh);
+
+    const animate = () => {
+      requestAnimationFrame(animate);
+      uniforms.time.value += 0.02;
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    window.addEventListener("resize", () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
