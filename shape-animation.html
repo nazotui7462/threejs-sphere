@@ -162,7 +162,27 @@
   return result;
 }
 
+function shapeTorusClean() {
+  const result = [];
+  const R = 1.0;  // 大きな輪（外周）の半径
+  const r = 0.35; // 小さな輪（断面）の半径
 
+  for (let i = 0; i < pointCount; i++) {
+    const t = i / pointCount;
+    
+    // トーラス表面を均等にカバーするための黄金角っぽい分布
+    const u = 2 * Math.PI * t;
+    const v = 2 * Math.PI * ((i * 0.6180339887) % 1); // 黄金比ベースで均等分布
+
+    const x = (R + r * Math.cos(v)) * Math.cos(u);
+    const y = (R + r * Math.cos(v)) * Math.sin(u);
+    const z = r * Math.sin(v);
+
+    result.push(new THREE.Vector3(x * 0.9, z * 0.9, y * 0.9)); // スケール＆z方向調整
+  }
+
+  return result;
+}
 
   function shapeStar() {
     return fibonacciDirections.map(dir => {
@@ -171,7 +191,7 @@
     });
   }
 
-  const shapeFunctions = [shapeSphere, shapeCube, shapeSpiralSphere, shapeStar];
+  const shapeFunctions = [shapeSphere, shapeCube, shapeTorusClean, shapeStar];
 
   const geometry = new THREE.BufferGeometry();
   const positionArray = new Float32Array(pointCount * 3);
