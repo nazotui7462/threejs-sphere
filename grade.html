@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>メッシュグラデーションの背景</title>
+    <style>
+        /* ページ全体の設定 */
+        html, body {
+            width: 100%;
+            height: 100vh; /* ビューポートの高さいっぱい */
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* スクロールバーを非表示 */
+            
+            /* 全体の背景色。画像の一番明るい部分に近い色 */
+            background-color: #fdf7f9;
+        }
+
+        /* ぼかしエフェクトをかけるためのコンテナ */
+        .gradient-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            
+            /*
+             * これが魔法の正体です！
+             * このコンテナ内のすべての要素（ブロブ）に
+             * 強力なぼかしをかけて滑らかに混ぜ合わせます。
+             */
+            filter: blur(150px);
+            
+            /* ブラウザに最適化を促すヒント */
+            will-change: filter;
+        }
+
+        /* 色のブロブ（塊）の共通スタイル */
+        .blob {
+            position: absolute;
+            opacity: 1.0;
+            /* スムーズなアニメーション */
+            transition: transform 8s ease-in-out, opacity 4s ease-in-out;
+            /* パフォーマンス最適化 */
+            will-change: transform;
+            /* 形はJavaScriptで動的に設定されます */
+        }
+
+        /*
+         * きらめき（星）
+         * これらはぼかしコンテナの *外* に配置して、
+         * ぼやけないようにします。
+         */
+        /* .sparkle {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background-color: #ffffff;
+            /* 4点の星の形を clip-path で作成 */
+            /*
+            clip-path: polygon(50% 0%, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0% 50%, 40% 40%);
+            transform: rotate(20deg);
+        } */
+
+        /* 右下のきらめき */
+        .s1 {
+            bottom: 30px;
+            right: 30px;
+        }
+
+        /* 左上のきらめき (小さめ・薄め) */
+        .s2 {
+            top: 25px;
+            left: 25px;
+            width: 8px;
+            height: 8px;
+            opacity: 0.4;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 
+      色とぼかしの本体。
+      この中の .blob が filter: blur() によって
+      滑らかなグラデーションになります。
+    -->
+    <div class="gradient-container" id="gradientContainer">
+        <!-- ブロブはJavaScriptで動的に生成されます -->
+    </div>
+
+    <!-- 
+      きらめき
+      ぼかしコンテナの外に置くことで、くっきり表示されます。
+    -->
+    <div class="sparkles" id="sparklesContainer">
+        <!-- きらめきはJavaScriptで動的に生成されます -->
+    </div>
+
+    <script>
+        // カラーパレット
+        const colors = [
+            '#B3E0F0', // 水色
+            '#B3F0E9', // ミントグリーン
+            '#CCEAFC', // 淡い青
+            '#DADFFB', // ラベンダー
+            '#DAFBF9', // 淡いミント
+            '#DDC9FF', // 薄い紫
+            '#E8E8E8', // ライトグレー
+            '#FFFFFF'  // 白
+        ];
+
+        const gradientContainer = document.getElementById('gradientContainer');
+        const sparklesContainer = document.getElementById('sparklesContainer');
+
+        // ブロブの数を設定（画面サイズに応じて調整）
+        const blobCount = Math.floor((window.innerWidth * window.innerHeight) / 50000) + 5;
+        const minBlobCount = 6;
+        const maxBlobCount = 12;
+        const actualBlobCount = Math.min(Math.max(blobCount, minBlobCount), maxBlobCount);
+
+        // ピーナッツ型や歪な形を生成する関数
+        function generateBlobShape(blob) {
+            const shapeType = Math.random();
+            
+            if (shapeType < 0.35) {
+                // ピーナッツ型（border-radiusで表現）
+                const r1 = 30 + Math.random() * 20; // 30-50%
+                const r2 = 40 + Math.random() * 20; // 40-60%
+                const r3 = 30 + Math.random() * 20;
+                const r4 = 40 + Math.random() * 20;
+                blob.style.borderRadius = `${r1}% ${r2}% ${r3}% ${r4}% / ${r2}% ${r1}% ${r4}% ${r3}%`;
+                return null; // clip-pathは使わない
+            } else if (shapeType < 0.65) {
+                // 歪な楕円型
+                const rx = 40 + Math.random() * 15; // 40-55%
+                const ry = 30 + Math.random() * 20; // 30-50%
+                return `ellipse(${50}% ${50}% / ${rx}% ${ry}%)`;
+            } else if (shapeType < 0.85) {
+                // 不規則な多角形（有機的な形）
+                const points = [];
+                const numPoints = 6 + Math.floor(Math.random() * 4); // 6-9点
+                for (let i = 0; i < numPoints; i++) {
+                    const angle = (i / numPoints) * 360 + (Math.random() - 0.5) * 30; // ランダムな角度のずれ
+                    const radius = 35 + Math.random() * 15; // 35-50%
+                    const x = 50 + radius * Math.cos(angle * Math.PI / 180);
+                    const y = 50 + radius * Math.sin(angle * Math.PI / 180);
+                    points.push(`${x}% ${y}%`);
+                }
+                return `polygon(${points.join(', ')})`;
+            } else {
+                // 歪んだ円（スケールを変えた円）
+                const scaleX = 0.7 + Math.random() * 0.6; // 0.7-1.3
+                const scaleY = 0.7 + Math.random() * 0.6;
+                return `ellipse(50% 50% / ${50 * scaleX}% ${50 * scaleY}%)`;
+            }
+        }
+
+        // ブロブを動的に生成
+        function createBlobs() {
+            gradientContainer.innerHTML = '';
+            
+            for (let i = 0; i < actualBlobCount; i++) {
+                const blob = document.createElement('div');
+                blob.className = 'blob';
+                
+                // ランダムな色を選択
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                blob.style.background = color;
+                
+                // ランダムなサイズ（30vmin ～ 60vmin）
+                const size = 30 + Math.random() * 30;
+                blob.style.width = size + 'vmin';
+                blob.style.height = size + 'vmin';
+                
+                // ピーナッツ型や歪な形を適用
+                const clipPath = generateBlobShape(blob);
+                if (clipPath) {
+                    blob.style.clipPath = clipPath;
+                    blob.style.webkitClipPath = clipPath; // Safari対応
+                }
+                
+                // ランダムな回転（有機的な感じを出す）
+                blob.style.transform = `rotate(${Math.random() * 360}deg)`;
+                
+                // ランダムな初期位置
+                const initialX = Math.random() * 100;
+                const initialY = Math.random() * 100;
+                blob.style.left = initialX + '%';
+                blob.style.top = initialY + '%';
+                
+                gradientContainer.appendChild(blob);
+                
+                // ランダムに動かす
+                animateBlob(blob);
+            }
+        }
+
+        // イージング関数の配列（滑らかな動きのバリエーション）
+        const easingFunctions = [
+            'cubic-bezier(0.4, 0, 0.2, 1)',      // ease-in-out（標準）
+            'cubic-bezier(0.25, 0.1, 0.25, 1)', // ease（滑らか）
+            'cubic-bezier(0.4, 0, 0.6, 1)',     // ease-in-out（強め）
+            'cubic-bezier(0.34, 1.56, 0.64, 1)', // バウンス風
+            'cubic-bezier(0.68, -0.55, 0.265, 1.55)' // エラスティック風
+        ];
+
+        // ブロブをランダムに動かす関数
+        function animateBlob(blob) {
+            const moveBlob = () => {
+                // ランダムな新しい位置
+                const newX = Math.random() * 100;
+                const newY = Math.random() * 100;
+                
+                // ランダムな移動時間（2秒～4秒）- より速く
+                const duration = 2 + Math.random() * 2;
+                
+                // ランダムなイージング関数を選択
+                const easing = easingFunctions[Math.floor(Math.random() * easingFunctions.length)];
+                
+                // イージング付きのtransitionを設定
+                blob.style.transition = `left ${duration}s ${easing}, top ${duration}s ${easing}`;
+                
+                // 位置を更新（transitionでスムーズに移動）
+                blob.style.left = newX + '%';
+                blob.style.top = newY + '%';
+                
+                // 次の移動をスケジュール
+                setTimeout(moveBlob, duration * 1000);
+            };
+            
+            // 最初の移動を開始（ランダムな遅延で開始）
+            setTimeout(moveBlob, Math.random() * 1000);
+        }
+
+        // きらめきを動的に生成
+        function createSparkles() {
+            sparklesContainer.innerHTML = '';
+            
+            const sparkleCount = 2 + Math.floor(Math.random() * 3); // 2～4個
+            
+            for (let i = 0; i < sparkleCount; i++) {
+                const sparkle = document.createElement('div');
+                sparkle.className = 'sparkle';
+                
+                // ランダムな位置
+                sparkle.style.top = Math.random() * 100 + '%';
+                sparkle.style.left = Math.random() * 100 + '%';
+                
+                // ランダムなサイズ
+                const size = 8 + Math.random() * 8;
+                sparkle.style.width = size + 'px';
+                sparkle.style.height = size + 'px';
+                
+                // ランダムな透明度
+                sparkle.style.opacity = 0.3 + Math.random() * 0.4;
+                
+                sparklesContainer.appendChild(sparkle);
+            }
+        }
+
+        // 初期化
+        createBlobs();
+        createSparkles();
+
+        // ウィンドウリサイズ時の処理
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                createBlobs();
+            }, 300);
+        });
+    </script>
+
+</body>
+</html>
